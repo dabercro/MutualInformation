@@ -28,7 +28,8 @@ Double_t histEntropy(TH1F *aHist,int numBins,Double_t normWeight,Double_t normEr
 
 }
 
-void MutualInfoSingleVar(TString theFormula = "fjet1MassSDb2",int numBins = 80,Double_t histMin = -20,Double_t histMax = 300){
+void MutualInfoSingleVar(TString theFormula = "fjet1MassSDb2",TString histFileName = "fjet1MassSDb2",
+                         int numBins = 80,Double_t histMin = -20,Double_t histMax = 300){
 
   TFile *signalFile = new TFile("signal_word.root");
   TTree *signalTree = (TTree*) signalFile->FindObjectAny("DMSTree");
@@ -39,19 +40,12 @@ void MutualInfoSingleVar(TString theFormula = "fjet1MassSDb2",int numBins = 80,D
   TH1F *backgdHist = new TH1F("Backgd","Backgd",numBins,histMin,histMax); backgdHist->Sumw2();
   TH1F *sumHist = new TH1F("Sum","Sum",numBins,histMin,histMax); sumHist->Sumw2();
 
-  // TH1F *signalHalfHist = new TH1F("SignalHalf","SignalHalf",numBins/2+1,histMin,histMax); signalHalfHist->Sumw2();
-  // TH1F *backgdHalfHist = new TH1F("BackgdHalf","BackgdHalf",numBins/2+1,histMin,histMax); backgdHalfHist->Sumw2();
-
   signalTree->Draw(theFormula + TString(">>Signal"),"weight*(abs(fjet1PartonId)==24)");
   backgdTree->Draw(theFormula + TString(">>Backgd"),"weight");
   *sumHist = *signalHist + *backgdHist;
-  // signalTree->Draw(theFormula + TString(">>SignalHalf"),"weight*(abs(fjet1PartonId)==24)");
-  // backgdTree->Draw(theFormula + TString(">>BackgdHalf"),"weight");
 
   Double_t signalErr = 0.;
   Double_t signalWeights = signalHist->IntegralAndError(0,numBins,signalErr);
-  // Double_t backgdErr = 0.;
-  // Double_t backgdWeights = backgdHist->IntegralAndError(0,numBins,backgdErr);
   Double_t sumErr = 0.;
   Double_t sumWeights = sumHist->IntegralAndError(0,numBins,sumErr);
 
@@ -66,17 +60,17 @@ void MutualInfoSingleVar(TString theFormula = "fjet1MassSDb2",int numBins = 80,D
   Double_t unionErr = 0.;
   Double_t unionEntropy = histEntropy(signalHist,numBins,sumWeights,sumErr,unionErr) +
                           histEntropy(backgdHist,numBins,sumWeights,sumErr,unionErr);
-  // Double_t unionEntropy = histEntropy(signalHalfHist,numBins/2+1,sumWeights) + histEntropy(backgdHalfHist,numBins/2+1,sumWeights);
 
   Double_t MutualInfo = truthEntropy + varEntropy - unionEntropy;
   Double_t MutualErr = sqrt(TMath::Power(truthErr,2) + TMath::Power(varErr,2) + TMath::Power(unionErr,2));
 
+  cout << theFormula << endl;
   cout << "H(T):   " << truthEntropy << " +- " << truthErr  << endl;
   cout << "H(A):   " << varEntropy   << " +- " << varErr    << endl;
   cout << "H(T,A): " << unionEntropy << " +- " << unionErr  << endl;
   cout << "I(T;A): " << MutualInfo   << " +- " << MutualErr << endl;
 
-  TFile *outFile = new TFile(TString("scratch/") + theFormula + TString(".root"),"RECREATE");
+  TFile *outFile = new TFile(TString("scratch/") + histFileName + TString(".root"),"RECREATE");
   signalHist->Write();
   backgdHist->Write();
   sumHist->Write();
