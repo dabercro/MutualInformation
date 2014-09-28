@@ -10,7 +10,8 @@
 #include "TH1F.h"
 #include "TH1.h"
 #include "TMath.h"
-#include "THn.h"
+#include "THnSparse.h"
+#include "TTreeFormula.h"
 
 Float_t histEntropy(THnSparseF *aHist,int dim, int* numBins,Float_t normWeight,Float_t normErr,Float_t& entropyErr){
 
@@ -96,6 +97,7 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
     fprintf(stderr,"WARNING: You are about to use up to %i B of memory\n",expMem);
     fprintf(stderr,"Pausing for %.2f seconds so you can re-evaluate and hit Ctrl-C",float(expMem)/(1024*1024*512));
     usleep(expMem*100/(1024*1024*512));
+    cout << endl << endl;
 
     //file io 
   TFile *signalFile = new TFile("signal_word.root");
@@ -126,7 +128,7 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
     signalHist->Fill(evals,weight);
     sumHist->Fill(evals,weight);
   }
-  Float_t dummy;
+//   Float_t dummy;
   //fprintf(stderr,"%f %f\n",IntAndErr(signalHist,dim,numBins,dummy),test_int/IntAndErr(signalHist,dim,numBins,dummy));
 
   //background
