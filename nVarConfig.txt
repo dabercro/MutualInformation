@@ -1,0 +1,4 @@
+2
+TrimmedMass
+fjet1MassSDb2 80  -20 300
+fjet1Tau2/fjet1Tau1 50  0 1

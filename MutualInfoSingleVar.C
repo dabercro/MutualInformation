@@ -15,7 +15,7 @@ Double_t histEntropy(TH1F *aHist,int numBins,Double_t normWeight,Double_t normEr
   Double_t tempErr = 0.;
   Double_t entropy = 0.;
 
-  for(int i0 = 1;i0 < numBins+1;i0++){
+  for(int i0 = 1;i0 <= numBins;i0++){
     tempProb = aHist->GetBinContent(i0)/normWeight;
     tempErr = sqrt(TMath::Power(aHist->GetBinError(i0)/normWeight,2) + TMath::Power(tempProb*normErr/normWeight,2));
     if(tempProb != 0){
