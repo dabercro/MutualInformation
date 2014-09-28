@@ -15,7 +15,7 @@ Double_t histEntropy(TH1F *aHist,int numBins,Double_t normWeight,Double_t normEr
   Double_t tempErr = 0.;
   Double_t entropy = 0.;
 
-  for(int i0 = 0;i0 < numBins;i0++){
+  for(int i0 = 1;i0 <= numBins;i0++){
     tempProb = aHist->GetBinContent(i0)/normWeight;
     tempErr = sqrt(TMath::Power(aHist->GetBinError(i0)/normWeight,2) + TMath::Power(tempProb*normErr/normWeight,2));
     if(tempProb != 0){
@@ -46,8 +46,10 @@ void MutualInfoSingleVar(TString theFormula = "fjet1MassSDb2",TString histFileNa
 
   Double_t signalErr = 0.;
   Double_t signalWeights = signalHist->IntegralAndError(0,numBins,signalErr);
+  fprintf(stderr,"sig int %f\n",signalWeights);
   Double_t sumErr = 0.;
   Double_t sumWeights = sumHist->IntegralAndError(0,numBins,sumErr);
+  fprintf(stderr,"sum int %f\n",sumWeights);
 
   Double_t signalFrac = signalWeights/sumWeights;
   Double_t signalFracErr = sqrt(TMath::Power(signalErr/sumWeights,2) + TMath::Power(signalWeights*sumErr/(TMath::Power(sumWeights,2)),2));
