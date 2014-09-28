@@ -18,18 +18,19 @@ Float_t histEntropy(THnSparseF *aHist,int dim, int* numBins,Float_t normWeight,F
   entropyErr = TMath::Power(entropyErr,2.);
   Float_t tempErr = 0.;
   Float_t entropy = 0.;
+  Double_t minusInfinity=TMath::Log2(0);
   int *indices=new int[dim];
   for(int i=0;i<dim;i++) {
     indices[i]=1; //the first bin
   }
   while (1) {
     tempProb = aHist->GetBinContent(indices)/normWeight;
-//    fprintf(stderr,"p(%i)=%.4f\t%.4f\n",indices[0],tempProb,aHist->GetBinContent(indices));
     tempErr = TMath::Power(aHist->GetBinError(indices)/normWeight,2) + TMath::Power(tempProb*normErr/normWeight,2);
     //tempErr(p) is sigma^2(p)
-    if (tempProb) {
-      entropy = entropy - tempProb*TMath::Log2(tempProb);
-      entropyErr = entropyErr + TMath::Power(TMath::Abs(1+TMath::Log2(tempProb)),2)*tempErr;
+    Double_t logProb = TMath::Log2(tempProb);
+    if (logProb>minusInfinity) {
+      entropy = entropy - tempProb*logProb;
+      entropyErr = entropyErr + TMath::Power(TMath::Abs(1+logProb),2)*tempErr;
       //entropyErr is sum_{bins} (1+log(p))^2*sigma^2(p)
       //changed this to reduce # of squares/sqrts
       }
@@ -70,26 +71,6 @@ Float_t IntAndErr(THnSparseF*aHist, int dim, int *numBins,Float_t &integralErr) 
  return integral;   
 }
 
-/*void MutualInfoNVars(TString* theFormula = 0,TString histFileName = "fjet1MassSDb2", Int_t dim=1,Int_t* numBins = 0,Double_t* histMin = 0,Double_t* histMax = 0){
-    if (dim==1) { // because vim syntax highlighting is stupid; don't ask
-        if (theFormula==0) {
-          theFormula = (TString*)malloc(1*sizeof(TString));
-          theFormula[0]=TString("fjet1MassSDb2");
-        }
-        if (numBins==0) {
-            numBins = (Int_t*)malloc(1*sizeof(Int_t));
-            numBins[0]=80;
-        }
-        if (histMin==0) {
-            histMin = (Double_t*)malloc(1*sizeof(Double_t));
-            histMin[0]=-20;
-        }
-        if (histMax==0) {
-            histMax = (Double_t*)malloc(1*sizeof(Double_t));
-            histMax[0]=300;
-        }
-    }
-*/
 void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
   //read config file
   Int_t dim=0;
@@ -99,6 +80,7 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
   cfgFile >> dim;
   if(!cfgFile.good()) { fprintf(stderr,"config file has bad format or does not exist %i\n",dim); exit(1); }
   cfgFile >> histFileName;
+//  dim=1;
   TString*theFormula = new TString[dim];
   Int_t* numBins = new Int_t[dim];
   Double_t* histMin = new Double_t[dim];
@@ -107,7 +89,6 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
     cfgFile >> theFormula[i] >> numBins[i] >> histMin[i] >> histMax[i];
   }  
   cfgFile.close();
-
     //don't use so much memory you unmount hadoop
     Int_t expMem=1;
     for(int i=0;i<dim;i++)  expMem*=numBins[i];
@@ -170,9 +151,9 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
 
   //integrals and error prop
   Float_t signalErr = 0.;
-  Float_t signalIntegral = IntAndErr(signalHist,1,numBins,signalErr);
+  Float_t signalIntegral = IntAndErr(signalHist,dim,numBins,signalErr);
   Float_t sumErr = 0.;
-  Float_t sumIntegral = IntAndErr(sumHist,1,numBins,sumErr);
+  Float_t sumIntegral = IntAndErr(sumHist,dim,numBins,sumErr);
   Float_t signalFrac = signalIntegral/sumIntegral;
   Float_t signalFracErr = sqrt(TMath::Power(signalErr/sumIntegral,2) + TMath::Power(signalIntegral*sumErr/(TMath::Power(sumIntegral,2)),2));
 
@@ -188,7 +169,11 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
   //info
   Float_t MutualInfo = truthEntropy + varEntropy - unionEntropy;
   Float_t MutualErr = sqrt(TMath::Power(truthErr,2) + TMath::Power(varErr,2) + TMath::Power(unionErr,2));
-  for(int i=0;i<dim;i++) {  cout << theFormula[i] << ((i==dim-1) ? endl : ":"); }
+  for(int i=0;i<dim;i++) {  
+    cout << theFormula[i] ;
+    if (i==dim-1) cout<< endl; 
+    else cout<< ":";
+  }
   cout << "H(T):   " << truthEntropy << " +- " << truthErr  << endl;
   cout << "H(A):   " << varEntropy   << " +- " << varErr    << endl;
   cout << "H(T,A): " << unionEntropy << " +- " << unionErr  << endl;
