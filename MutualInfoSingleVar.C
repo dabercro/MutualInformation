@@ -46,10 +46,8 @@ void MutualInfoSingleVar(TString theFormula = "fjet1MassSDb2",TString histFileNa
 
   Double_t signalErr = 0.;
   Double_t signalWeights = signalHist->IntegralAndError(0,numBins,signalErr);
-  fprintf(stderr,"sig int %f\n",signalWeights);
   Double_t sumErr = 0.;
   Double_t sumWeights = sumHist->IntegralAndError(0,numBins,sumErr);
-  fprintf(stderr,"sum int %f\n",sumWeights);
 
   Double_t signalFrac = signalWeights/sumWeights;
   Double_t signalFracErr = sqrt(TMath::Power(signalErr/sumWeights,2) + TMath::Power(signalWeights*sumErr/(TMath::Power(sumWeights,2)),2));
