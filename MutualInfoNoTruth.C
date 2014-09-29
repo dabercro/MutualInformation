@@ -13,6 +13,10 @@
 #include "THnSparse.h"
 #include "TTreeFormula.h"
 
+//identical to MutualInfoNVars, but computes I(a,b) instead of I(T,A)
+//where a,b are single variables instead of sets of variables
+//to be used for benchmarking mutual info with truth
+
 Float_t histEntropy(THnSparseF *aHist,int dim, int* numBins,Float_t normWeight,Float_t normErr,Float_t& entropyErr){
 
   Float_t tempProb = 0.;
@@ -72,16 +76,16 @@ Float_t IntAndErr(THnSparseF*aHist, int dim, int *numBins,Float_t &integralErr) 
  return integral;   
 }
 
-void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
+void MutualInfoNoTruth(TString cfgFileName="noTruthConfig.txt") {
   //read config file
-  Int_t dim=0;
+  Int_t dim;
   TString histFileName;
   ifstream cfgFile;
   cfgFile.open(cfgFileName.Data());
   cfgFile >> histFileName;
   cfgFile >> dim;
+  if (dim!=2) { fprintf(stderr,"this script should only be used to compare two variables at a time\n"); exit(1); }
   if(!cfgFile.good()) { fprintf(stderr,"config file has bad format or does not exist %i\n",dim); exit(1); }
-//  dim=1;
   TString*theFormula = new TString[dim];
   Int_t* numBins = new Int_t[dim];
   Double_t* histMin = new Double_t[dim];
@@ -90,11 +94,13 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
     cfgFile >> theFormula[i] >> numBins[i] >> histMin[i] >> histMax[i];
   }  
   cfgFile.close();
+
+
     //don't use so much memory you unmount hadoop
     Int_t expMem=1;
     for(int i=0;i<dim;i++)  expMem*=numBins[i];
     expMem*=6*sizeof(Float_t);
-    fprintf(stderr,"WARNING: You are about to use up to %i MB of memory\n",float(expMem)/(1024*1024));
+    fprintf(stderr,"WARNING: You are about to use up to %.2f MB of memory\n",float(expMem)/(1024*1024));
     fprintf(stderr,"Pausing for %.2f seconds so you can re-evaluate and hit Ctrl-C",float(expMem)/(1024*1024*512));
     usleep(expMem*100/(1024*1024*512));
     cout << endl << endl;
@@ -109,9 +115,9 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
   TTreeFormula *fWeight = new TTreeFormula("weight","weight",signalTree);
   TTreeFormula *fSigCut = new TTreeFormula("abs(fjet1PartonId)","abs(fjet1PartonId)",signalTree);
     
-  THnSparseF *signalHist = new THnSparseF("signalHist","signalHist",dim,numBins,histMin,histMax);  signalHist->Sumw2();
-  THnSparseF *backgdHist = new THnSparseF("Backgd","Backgd",dim,numBins,histMin,histMax);  backgdHist->Sumw2();
-  THnSparseF *sumHist = new THnSparseF("Sum","Sum",dim,numBins,histMin,histMax); sumHist->Sumw2();
+  THnSparseF *AHist = new THnSparseF("AHist","AHist",1,&(numBins[0]),&(histMin[0]),&(histMax[0]));  AHist->Sumw2();
+  THnSparseF *BHist = new THnSparseF("BHist","BHist",1,&(numBins[1]),&(histMin[1]),&(histMax[1]));  BHist->Sumw2();
+  THnSparseF *ABHist = new THnSparseF("ABHist","ABHist",2,numBins,histMin,histMax); ABHist->Sumw2();
 
   Double_t *evals = new Double_t[dim];
   Double_t weight;
@@ -125,8 +131,9 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
       evals[j] = formulas[j]->EvalInstance();
     }
     weight = fWeight->EvalInstance();
-    signalHist->Fill(evals,weight);
-    sumHist->Fill(evals,weight);
+    AHist->Fill(&(evals[0]),weight);
+    BHist->Fill(&(evals[1]),weight);
+    ABHist->Fill(evals,weight);
   }
   //background
   for(int i=0;i<dim;i++) {
@@ -144,45 +151,45 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
       evals[j] = formulas[j]->EvalInstance();
     }
     weight = fWeight->EvalInstance();
-    backgdHist->Fill(evals,weight);
-    sumHist->Fill(evals,weight);
+    AHist->Fill(&(evals[0]),weight);
+    BHist->Fill(&(evals[1]),weight);
+    ABHist->Fill(evals,weight);
   }
 
   //integrals and error prop
-  Float_t signalErr = 0.;
-  Float_t signalIntegral = IntAndErr(signalHist,dim,numBins,signalErr);
-  Float_t sumErr = 0.;
-  Float_t sumIntegral = IntAndErr(sumHist,dim,numBins,sumErr);
-  Float_t signalFrac = signalIntegral/sumIntegral;
-  Float_t signalFracErr = sqrt(TMath::Power(signalErr/sumIntegral,2) + TMath::Power(signalIntegral*sumErr/(TMath::Power(sumIntegral,2)),2));
-
+  Float_t AIntErr = 0.;
+  Float_t AIntegral = IntAndErr(AHist,1,&(numBins[0]),AIntErr);
+  Float_t BIntErr = 0.;
+  Float_t BIntegral = IntAndErr(BHist,1,&(numBins[1]),BIntErr);
+  Float_t ABIntErr = 0.;
+  Float_t ABIntegral = IntAndErr(ABHist,dim,numBins,ABIntErr);
   //entropies
-  Float_t truthEntropy = -1*signalFrac*TMath::Log2(signalFrac) - (1-signalFrac)*TMath::Log2(1-signalFrac);
-  Float_t truthErr = (TMath::Abs(1+TMath::Log2(signalFrac)) + TMath::Abs(1+TMath::Log2(1-signalFrac)))*signalFracErr;
 
-  Float_t varErr = 0.;
-  Float_t varEntropy = histEntropy(sumHist,dim,numBins,sumIntegral,sumErr,varErr);
-  Float_t unionErr = 0.;
-  Float_t unionEntropy = histEntropy(signalHist,dim,numBins,sumIntegral,sumErr,unionErr) +
-                          histEntropy(backgdHist,dim,numBins,sumIntegral,sumErr,unionErr);
+  Float_t AErr = 0.;
+  Float_t AEntropy = histEntropy(AHist,1,&(numBins[0]),AIntegral,AIntErr,AErr);
+  Float_t BErr = 0.;
+  Float_t BEntropy = histEntropy(BHist,1,&(numBins[1]),BIntegral,BIntErr,BErr);
+  Float_t ABErr = 0.;
+  Float_t ABEntropy = histEntropy(ABHist,dim,&(numBins[1]),ABIntegral,ABIntErr,ABErr);
+
   //info
-  Float_t MutualInfo = truthEntropy + varEntropy - unionEntropy;
-  Float_t MutualErr = sqrt(TMath::Power(truthErr,2) + TMath::Power(varErr,2) + TMath::Power(unionErr,2));
+  Float_t MutualInfo = AEntropy+BEntropy-ABEntropy;
+  Float_t MutualErr = sqrt(TMath::Power(AErr,2) + TMath::Power(BErr,2) + TMath::Power(ABErr,2));
   for(int i=0;i<dim;i++) {  
     cout << theFormula[i] ;
     if (i==dim-1) cout<< endl; 
     else cout<< ":";
   }
-  cout << "H(T):   " << truthEntropy << " +- " << truthErr  << endl;
-  cout << "H(A):   " << varEntropy   << " +- " << varErr    << endl;
-  cout << "H(T,A): " << unionEntropy << " +- " << unionErr  << endl;
-  cout << "I(T;A): " << MutualInfo   << " +- " << MutualErr << endl;
+  cout << "H(A):   " << AEntropy << " +- " << AErr  << endl;
+  cout << "H(B):   " << BEntropy   << " +- " << BErr    << endl;
+  cout << "H(A,B): " << ABEntropy << " +- " << ABErr  << endl;
+  cout << "I(A;B): " << MutualInfo   << " +- " << MutualErr << endl;
 
   //file io
   TFile *outFile = new TFile(TString("scratch/") + histFileName + TString(".root"),"RECREATE");
-  signalHist->Write();
-  backgdHist->Write();
-  sumHist->Write();
+  AHist->Write();
+  BHist->Write();
+  ABHist->Write();
   outFile->Close();
 
 }
