@@ -170,7 +170,7 @@ void MutualInfoNoTruth(TString cfgFileName="noTruthConfig.txt") {
   Float_t BErr = 0.;
   Float_t BEntropy = histEntropy(BHist,1,&(numBins[1]),BIntegral,BIntErr,BErr);
   Float_t ABErr = 0.;
-  Float_t ABEntropy = histEntropy(ABHist,dim,&(numBins[1]),ABIntegral,ABIntErr,ABErr);
+  Float_t ABEntropy = histEntropy(ABHist,dim,numBins,ABIntegral,ABIntErr,ABErr);
 
   //info
   Float_t MutualInfo = AEntropy+BEntropy-ABEntropy;
