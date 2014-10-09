@@ -1,3 +1,14 @@
+#include <iostream>
+#include <string>
+#include <TObject.h>
+
+#include "TH3F.h"
+#include "TH3.h"
+#include "TH2F.h"
+#include "TH2.h"
+#include "TH1F.h"
+#include "TH1.h"
+
 Double_t histEntropy(TH1F *aHist,int numBins,Double_t normWeight,Double_t normErr,Double_t& entropyErr){
 
   Double_t tempProb = 0.;

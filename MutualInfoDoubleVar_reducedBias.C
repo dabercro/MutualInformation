@@ -5,8 +5,8 @@
 #include "TFile.h"
 #include "TTree.h"
 #include "TString.h"
-#include "TH1F.h"
-#include "TH1.h"
+#include "TH2F.h"
+#include "TH2.h"
 #include "TMath.h"
 
 #include "histEntropy.hh"
@@ -21,8 +21,8 @@
 
 void MutualInfoDoubleVar_reducedBias(TString theFormula_x = "fjet1MassTrimmed",TString theFormula_y = "fjet1PullAngle",
                          TString histFileName = "test",
-                         int numBins_x = 55,Double_t histMin_x =  -20,Double_t histMax_x = 400,
-                         int numBins_y = 35,Double_t histMin_y = -3.5,Double_t histMax_y = 3.5){
+                         int numBins_x = 210,Double_t histMin_x =  -20,Double_t histMax_x = 400,
+                         int numBins_y = 140,Double_t histMin_y = -3.5,Double_t histMax_y = 3.5){
 
   TFile *signalFile = new TFile("signal_word.root");
   TTree *signalTree = (TTree*) signalFile->FindObjectAny("DMSTree");
@@ -46,6 +46,8 @@ void MutualInfoDoubleVar_reducedBias(TString theFormula_x = "fjet1MassTrimmed",T
 
   Double_t signalErr = 0.;
   Double_t signalWeights = signalHist->IntegralAndError(1,numBins_x,1,numBins_y,signalErr);
+  Double_t backgdErr = 0.;
+  Double_t backgdWeights = backgdHist->IntegralAndError(1,numBins_x,1,numBins_y,backgdErr);
   Double_t sumErr = 0.;
   Double_t sumWeights = sumHist->IntegralAndError(1,numBins_x,1,numBins_y,sumErr);
 
@@ -77,9 +79,9 @@ void MutualInfoDoubleVar_reducedBias(TString theFormula_x = "fjet1MassTrimmed",T
   /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   Double_t signalEntropyErr = 0.;
-  Double_t signalEntropy = histEntropy(signalHist,numBins,signalWeights,signalErr,signalEntropyErr);
+  Double_t signalEntropy = histEntropy(signalHist,numBins_x,numBins_y,signalWeights,signalErr,signalEntropyErr);
   Double_t backgdEntropyErr = 0.;
-  Double_t backgdEntropy = histEntropy(backgdHist,numBins,backgdWeights,backgdErr,backgdEntropyErr);
+  Double_t backgdEntropy = histEntropy(backgdHist,numBins_x,numBins_y,backgdWeights,backgdErr,backgdEntropyErr);
 
   TH2F *signalHist_0 = new TH2F("Signal_0",TString("Signal_0;")+theFormula_x+TString(";")+theFormula_y,
                               numBins_x,histMin_x,histMax_x,numBins_y,histMin_y,histMax_y);
@@ -101,7 +103,7 @@ void MutualInfoDoubleVar_reducedBias(TString theFormula_x = "fjet1MassTrimmed",T
   Double_t sumWeights_0 = sumHist_0->IntegralAndError(1,numBins_x,1,numBins_y,signalErr);
 
   Double_t mixedErr_0 = 0.;
-  Double_t mixedEntropy_0 = histEntropy(sumHist_0,numBins,sumWeights_0,sumErr_0,mixedErr_0);
+  Double_t mixedEntropy_0 = histEntropy(sumHist_0,numBins_x,numBins_y,sumWeights_0,sumErr_0,mixedErr_0);
 
   Double_t MutualInfo_0 = mixedEntropy_0 - signalFrac*signalEntropy - (1-signalFrac)*backgdEntropy;
   Double_t MutualErr_0  = sqrt(TMath::Power(mixedErr_0,2) +
@@ -137,7 +139,7 @@ void MutualInfoDoubleVar_reducedBias(TString theFormula_x = "fjet1MassTrimmed",T
   Double_t sumWeights_1 = sumHist_1->IntegralAndError(1,numBins_x,1,numBins_y,signalErr);
 
   Double_t mixedErr_1 = 0.;
-  Double_t mixedEntropy_1 = histEntropy(sumHist_1,numBins,sumWeights_1,sumErr_1,mixedErr_1);
+  Double_t mixedEntropy_1 = histEntropy(sumHist_1,numBins_x,numBins_y,sumWeights_1,sumErr_1,mixedErr_1);
 
   Double_t MutualInfo_1 = mixedEntropy_1 - signalFrac*signalEntropy - (1-signalFrac)*backgdEntropy;
   Double_t MutualErr_1  = sqrt(TMath::Power(mixedErr_1,2) +
@@ -162,9 +164,6 @@ void MutualInfoDoubleVar_reducedBias(TString theFormula_x = "fjet1MassTrimmed",T
   signalHist_1->Write();
   backgdHist_1->Write();
   sumHist_1->Write();
-  signalHist_x->Write();
-  backgdHist_x->Write();
-  sumHist_x->Write();
 
   outFile->Close();
 
