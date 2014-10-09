@@ -12,41 +12,9 @@
 #include "TMath.h"
 #include "THnSparse.h"
 #include "TTreeFormula.h"
+#include "histEntropy.hh"
 
-Float_t histEntropy(THnSparseF *aHist,int dim, int* numBins,Float_t normWeight,Float_t normErr,Float_t& entropyErr){
-
-  Float_t tempProb = 0.;
-  entropyErr = TMath::Power(entropyErr,2.);
-  Float_t tempErr = 0.;
-  Float_t entropy = 0.;
-  Double_t minusInfinity=TMath::Log2(0);
-  int *indices=new int[dim];
-  for(int i=0;i<dim;i++) {
-    indices[i]=1; //the first bin
-  }
-  while (1) {
-    tempProb = aHist->GetBinContent(indices)/normWeight;
-    tempErr = TMath::Power(aHist->GetBinError(indices)/normWeight,2) + TMath::Power(tempProb*normErr/normWeight,2);
-    //tempErr(p) is sigma^2(p)
-    Double_t logProb = TMath::Log2(tempProb);
-    if (logProb>minusInfinity) {
-      entropy = entropy - tempProb*logProb;
-      entropyErr = entropyErr + TMath::Power(TMath::Abs(1+logProb),2)*tempErr;
-      //entropyErr is sum_{bins} (1+log(p))^2*sigma^2(p)
-      //changed this to reduce # of squares/sqrts
-      }
-    int j;
-    for(j=0;j<dim;j++) {
-      indices[j]++;
-      if (indices[j] <= numBins[j]) break; //this is a valid index
-      else indices[j]=1; //done with valid indices, loop around to 1 ( 0 is underflow)
-    }
-    if(j==dim) break;
-  }
-  entropyErr = sqrt(entropyErr);
-  return entropy;
-
-}
+// N Variable 
 
 Float_t IntAndErr(THnSparseF*aHist, int dim, int *numBins,Float_t &integralErr) {
 //  Double_t integral=aHist->ComputeIntegral(); // I don't know why this always returns 1
@@ -72,7 +40,7 @@ Float_t IntAndErr(THnSparseF*aHist, int dim, int *numBins,Float_t &integralErr) 
  return integral;   
 }
 
-void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
+void MutualInfoNVars_reducedBias(TString cfgFileName="nVarConfig.txt") {
   //read config file
   Int_t dim=0;
   TString histFileName;
@@ -93,7 +61,7 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
     //don't use so much memory you unmount hadoop
     Int_t expMem=1;
     for(int i=0;i<dim;i++)  expMem*=numBins[i];
-    expMem*=6*sizeof(Float_t);
+    expMem*=10*sizeof(Float_t);
     fprintf(stderr,"WARNING: You are about to use up to %.2f MB of memory\n",float(expMem)/(1024*1024));
     fprintf(stderr,"Pausing for %.2f seconds so you can re-evaluate and hit Ctrl-C",float(expMem)/(1024*1024*512));
     usleep(expMem*100/(1024*1024*512));
@@ -109,9 +77,18 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
   TTreeFormula *fWeight = new TTreeFormula("weight","weight",signalTree);
   TTreeFormula *fSigCut = new TTreeFormula("abs(fjet1PartonId)","abs(fjet1PartonId)",signalTree);
     
-  THnSparseF *signalHist = new THnSparseF("signalHist","signalHist",dim,numBins,histMin,histMax);  signalHist->Sumw2();
-  THnSparseF *backgdHist = new THnSparseF("Backgd","Backgd",dim,numBins,histMin,histMax);  backgdHist->Sumw2();
-  THnSparseF *sumHist = new THnSparseF("Sum","Sum",dim,numBins,histMin,histMax); sumHist->Sumw2();
+  THnSparseF *signalHist = new THnSparseF("signalHist","signalHist",dim,numBins,histMin,histMax);  
+    signalHist->Sumw2();
+  THnSparseF *backgdHist = new THnSparseF("Backgd","Backgd",dim,numBins,histMin,histMax);  
+    backgdHist->Sumw2();
+  //sum of signal and backgd, used for computing integrals and errors
+  THnSparseF *sumHist = new THnSparseF("Sum","Sum",dim,numBins,histMin,histMax); 
+    sumHist->Sumw2(); 
+  //combined histograms of signal and backgd events, n(events) changed to eliminate bias
+  THnSparseF *combined0Hist = new THnSparseF("Combined0","Combined0",dim,numBins,histMin,histMax); 
+    combined0Hist->Sumw2();
+  THnSparseF *combined1Hist = new THnSparseF("Combined1","Combined1",dim,numBins,histMin,histMax); 
+    combined1Hist->Sumw2();
 
   Double_t *evals = new Double_t[dim];
   Double_t weight;
@@ -127,6 +104,9 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
     weight = fWeight->EvalInstance();
     signalHist->Fill(evals,weight);
     sumHist->Fill(evals,weight);
+    //take only half of the signal and background events, as per eq A.20
+    if (i%2==0) combined0Hist->Fill(evals,weight);
+    if (i%2==1) combined1Hist->Fill(evals,weight);
   }
   //background
   for(int i=0;i<dim;i++) {
@@ -146,6 +126,8 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
     weight = fWeight->EvalInstance();
     backgdHist->Fill(evals,weight);
     sumHist->Fill(evals,weight);
+    if (i%2==0) combined0Hist->Fill(evals,weight);
+    if (i%2==1) combined1Hist->Fill(evals,weight);    
   }
 
   //integrals and error prop
@@ -153,6 +135,10 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
   Float_t signalIntegral = IntAndErr(signalHist,dim,numBins,signalErr);
   Float_t sumErr = 0.;
   Float_t sumIntegral = IntAndErr(sumHist,dim,numBins,sumErr);
+  Float_t combined0Err = 0.;
+  Float_t combined0Integral = IntAndErr(combined0Hist,dim,numBins,combined0Err);
+  Float_t combined1Err = 0.;
+  Float_t combined1Integral = IntAndErr(combined1Hist,dim,numBins,combined1Err);  
   Float_t signalFrac = signalIntegral/sumIntegral;
   Float_t signalFracErr = sqrt(TMath::Power(signalErr/sumIntegral,2) + TMath::Power(signalIntegral*sumErr/(TMath::Power(sumIntegral,2)),2));
 
@@ -160,8 +146,14 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
   Float_t truthEntropy = -1*signalFrac*TMath::Log2(signalFrac) - (1-signalFrac)*TMath::Log2(1-signalFrac);
   Float_t truthErr = (TMath::Abs(1+TMath::Log2(signalFrac)) + TMath::Abs(1+TMath::Log2(1-signalFrac)))*signalFracErr;
 
-  Float_t varErr = 0.;
-  Float_t varEntropy = histEntropy(sumHist,dim,numBins,sumIntegral,sumErr,varErr);
+  // compute entropies of combined0 and combined1 (i.e. odd and even event numbers)
+  // and average them
+  Float_t var0Err = 0.;
+  Float_t var0Entropy = histEntropy(combined0Hist,dim,numBins,combined0Integral,combined0Err,var0Err);
+  Float_t var1Err = 0.;
+  Float_t var1Entropy = histEntropy(combined1Hist,dim,numBins,combined1Integral,combined0Err,var1Err);  
+  Float_t varErr = TMath::Max(var0Err,var1Err);
+  Float_t varEntropy = (var1Entropy + var0Entropy)/2.;
   Float_t unionErr = 0.;
   Float_t unionEntropy = histEntropy(signalHist,dim,numBins,sumIntegral,sumErr,unionErr) +
                           histEntropy(backgdHist,dim,numBins,sumIntegral,sumErr,unionErr);
@@ -183,6 +175,8 @@ void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
   signalHist->Write();
   backgdHist->Write();
   sumHist->Write();
+  combined0Hist->Write();
+  combined1Hist->Write();
   outFile->Close();
 
 }
