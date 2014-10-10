@@ -1,0 +1,4 @@
+Test
+3
+fjet1MassTrimmed   210   -20   400
+fjet1Tau2/fjet1Tau1   100   0   1
