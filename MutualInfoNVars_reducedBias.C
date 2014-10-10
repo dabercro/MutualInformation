@@ -13,32 +13,8 @@
 #include "THnSparse.h"
 #include "TTreeFormula.h"
 #include "histEntropy.hh"
-
+#include "nHistHelpers.hh"
 // N Variable 
-
-Float_t IntAndErr(THnSparseF*aHist, int dim, int *numBins,Float_t &integralErr) {
-//  Double_t integral=aHist->ComputeIntegral(); // I don't know why this always returns 1
-//  GetBinContent/Error works, so compute manually
-  Float_t integral=0.;
-  integralErr = 0;
-  int *indices=new int[dim];
-  for(int i=0;i<dim;i++) {
-    indices[i]=1; //the first bin
-  }
-  while (1) {
-    integral+=aHist->GetBinContent(indices);
-    integralErr+=TMath::Power(aHist->GetBinError(indices),2.);
-    int j;
-    for(j=0;j<dim;j++) {
-      indices[j]++;
-      if (indices[j] <= numBins[j]) break; //this is a valid index
-      else indices[j]=1; //done with valid indices, loop around
-    }
-    if(j==dim) break;
-  }
- integralErr=sqrt(integralErr);
- return integral;   
-}
 
 void MutualInfoNVars_reducedBias(TString cfgFileName="nVarConfig.txt") {
   //read config file
