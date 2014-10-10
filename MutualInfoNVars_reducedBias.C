@@ -57,6 +57,7 @@ void MutualInfoNVars_reducedBias(TString cfgFileName="nVarConfig.txt") {
   for(int i=0;i<dim;i++) { 
     cfgFile >> theFormula[i] >> numBins[i] >> histMin[i] >> histMax[i];
   }  
+  cout << "Finished reading config file..." << endl;
   cfgFile.close();
     //don't use so much memory you unmount hadoop
     Int_t expMem=1;
@@ -64,7 +65,7 @@ void MutualInfoNVars_reducedBias(TString cfgFileName="nVarConfig.txt") {
     expMem*=10*sizeof(Float_t);
     fprintf(stderr,"WARNING: You are about to use up to %.2f MB of memory\n",float(expMem)/(1024*1024));
     fprintf(stderr,"Pausing for %.2f seconds so you can re-evaluate and hit Ctrl-C",float(expMem)/(1024*1024*512));
-    usleep(expMem*100/(1024*1024*512));
+    // usleep(expMem*100/(1024*1024*512));
     cout << endl << endl;
 
     //file io 
@@ -89,6 +90,7 @@ void MutualInfoNVars_reducedBias(TString cfgFileName="nVarConfig.txt") {
     combined0Hist->Sumw2();
   THnSparseF *combined1Hist = new THnSparseF("Combined1","Combined1",dim,numBins,histMin,histMax); 
     combined1Hist->Sumw2();
+  cout << "Histograms Initialized..." << endl;
 
   Double_t *evals = new Double_t[dim];
   Double_t weight;
@@ -108,6 +110,7 @@ void MutualInfoNVars_reducedBias(TString cfgFileName="nVarConfig.txt") {
     if (i%2==0) combined0Hist->Fill(evals,weight);
     if (i%2==1) combined1Hist->Fill(evals,weight);
   }
+  cout << "Signal Filled..." << endl;
   //background
   for(int i=0;i<dim;i++) {
     formulas[i]->Delete();
@@ -129,6 +132,7 @@ void MutualInfoNVars_reducedBias(TString cfgFileName="nVarConfig.txt") {
     if (i%2==0) combined0Hist->Fill(evals,weight);
     if (i%2==1) combined1Hist->Fill(evals,weight);    
   }
+  cout << "Background Filled..." << endl;
 
   //integrals and error prop
   Float_t signalErr = 0.;

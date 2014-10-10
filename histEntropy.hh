@@ -2,6 +2,7 @@
 #include <string>
 #include <TObject.h>
 
+#include "THnSparse.h"
 #include "TH3F.h"
 #include "TH3.h"
 #include "TH2F.h"
@@ -78,8 +79,8 @@ Float_t histEntropy(THnSparseF *aHist, int dim, int* numBins,Float_t normWeight,
   entropyErr = TMath::Power(entropyErr,2.);
   Float_t tempErr = 0.;
   Float_t entropy = 0.;
-  Double_t minusInfinity=TMath::Log2(0);
   int *indices=new int[dim];
+  Double_t logProb = 0.;
   for(int i=0;i<dim;i++) {
     indices[i]=1; //the first bin
   }
@@ -87,8 +88,8 @@ Float_t histEntropy(THnSparseF *aHist, int dim, int* numBins,Float_t normWeight,
     tempProb = aHist->GetBinContent(indices)/normWeight;
     tempErr = TMath::Power(aHist->GetBinError(indices)/normWeight,2) + TMath::Power(tempProb*normErr/normWeight,2);
     //tempErr(p) is sigma^2(p)
-    Double_t logProb = TMath::Log2(tempProb);
-    if (logProb>minusInfinity) {
+    if(tempProb > 0){
+      logProb = TMath::Log2(tempProb);
       entropy = entropy - tempProb*logProb;
       entropyErr = entropyErr + TMath::Power(TMath::Abs(1+logProb),2)*tempErr;
       //entropyErr is sum_{bins} (1+log(p))^2*sigma^2(p)
