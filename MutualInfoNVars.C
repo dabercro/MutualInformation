@@ -12,65 +12,8 @@
 #include "TMath.h"
 #include "THnSparse.h"
 #include "TTreeFormula.h"
-
-Float_t histEntropy(THnSparseF *aHist,int dim, int* numBins,Float_t normWeight,Float_t normErr,Float_t& entropyErr){
-
-  Float_t tempProb = 0.;
-  entropyErr = TMath::Power(entropyErr,2.);
-  Float_t tempErr = 0.;
-  Float_t entropy = 0.;
-  Double_t minusInfinity=TMath::Log2(0);
-  int *indices=new int[dim];
-  for(int i=0;i<dim;i++) {
-    indices[i]=1; //the first bin
-  }
-  while (1) {
-    tempProb = aHist->GetBinContent(indices)/normWeight;
-    tempErr = TMath::Power(aHist->GetBinError(indices)/normWeight,2) + TMath::Power(tempProb*normErr/normWeight,2);
-    //tempErr(p) is sigma^2(p)
-    Double_t logProb = TMath::Log2(tempProb);
-    if (logProb>minusInfinity) {
-      entropy = entropy - tempProb*logProb;
-      entropyErr = entropyErr + TMath::Power(TMath::Abs(1+logProb),2)*tempErr;
-      //entropyErr is sum_{bins} (1+log(p))^2*sigma^2(p)
-      //changed this to reduce # of squares/sqrts
-      }
-    int j;
-    for(j=0;j<dim;j++) {
-      indices[j]++;
-      if (indices[j] <= numBins[j]) break; //this is a valid index
-      else indices[j]=1; //done with valid indices, loop around to 1 ( 0 is underflow)
-    }
-    if(j==dim) break;
-  }
-  entropyErr = sqrt(entropyErr);
-  return entropy;
-
-}
-
-Float_t IntAndErr(THnSparseF*aHist, int dim, int *numBins,Float_t &integralErr) {
-//  Double_t integral=aHist->ComputeIntegral(); // I don't know why this always returns 1
-//  GetBinContent/Error works, so compute manually
-  Float_t integral=0.;
-  integralErr = 0;
-  int *indices=new int[dim];
-  for(int i=0;i<dim;i++) {
-    indices[i]=1; //the first bin
-  }
-  while (1) {
-    integral+=aHist->GetBinContent(indices);
-    integralErr+=TMath::Power(aHist->GetBinError(indices),2.);
-    int j;
-    for(j=0;j<dim;j++) {
-      indices[j]++;
-      if (indices[j] <= numBins[j]) break; //this is a valid index
-      else indices[j]=1; //done with valid indices, loop around
-    }
-    if(j==dim) break;
-  }
- integralErr=sqrt(integralErr);
- return integral;   
-}
+#include "histEntropy.hh"
+#include "nHistHelpers.hh"
 
 void MutualInfoNVars(TString cfgFileName="nVarConfig.txt") {
   //read config file
